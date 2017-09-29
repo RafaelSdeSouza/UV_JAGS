@@ -98,8 +98,10 @@ means.se <-tapply(by, t.breaks, semean)
 
 gbin<-data.frame(x=seq(binx,max(x1), by=binx),y=means)
 
+
+
 ggplot(logitmod,aes(x=x1,y=by))+
-  geom_point(colour="#dd0100",size=1,alpha=0.45,position = position_jitter (h = 0.025))+
+#  geom_point(colour="#dd0100",size=1,alpha=0.45,position = position_jitter (h = 0.025))+
  geom_ribbon(data=gdata,aes(x=xx,ymin=lwr2, ymax=upr2,y=NULL), alpha=0.95, fill = c("#fac901"),show.legend=FALSE) +
   geom_ribbon(data=gdata,aes(x=xx,ymin=lwr1, ymax=upr1,y=NULL), alpha=0.95, fill=c("#225095"),show.legend=FALSE) +
   geom_point(aes(x=x,y=y),size=2.75,data=gbin,colour="#dd0100")+
