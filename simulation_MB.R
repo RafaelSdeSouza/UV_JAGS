@@ -11,13 +11,30 @@
 require(R2jags)
 require(ggplot2)
 source("https://raw.githubusercontent.com/johnbaums/jagstools/master/R/jagsresults.R")
-uv <-read.csv("logit_dataset.csv")
+set.seed(13979)
+nobs <- 2000
 
-set.seed(1056)                           # set seed to replicate example
-nobs= nrow(uv)                             # number of obsservations
-x1 <- uv$redshift                    # random uniform variable
-by <- uv$logit_class.1.uvup.2.uvweak.      # create y as adjusted random bernoulli variate
+x1 <- runif(nobs,0.015,0.4)
+Mag <- rnorm(nobs,-21,1)
 
+
+
+xb <- -2.5 + 20*x1 - 40*x1^2
+exb <- 1/(1+exp(-xb))
+by <- rbinom(nobs, size = 1, prob = exb)
+
+cutF <- -log(x1)-23
+logitmod <- data.frame(Mag,by, x1,cutF)
+logitmod$by = as.factor(logitmod$by)
+
+cuT <- Mag < cutF
+  
+  
+ggplot(logitmod[cuT,],aes(x=x1,y=Mag,color=by,shape=by)) +
+  geom_point()+ 
+  scale_color_tableau() +theme_bw() +
+  geom_point(aes(x=x1,y=cutF),color="gray") +
+  scale_y_reverse() 
 
 # Prepare data for prediction
 M=500
@@ -27,14 +44,17 @@ xx = seq(from =  min(x1),
 
 
 # Construct data dictionary
-logitmod <-data.frame(by, x1)
+
+# Cut on/off
+logitmod <- logitmod[cuT,]
+
 X <- model.matrix(~ 1+x1,
                   data = logitmod)
 K <- 3
-logit_data <- list(Y  = logitmod$by, # Response variable
+logit_data <- list(Y  = as.numeric(logitmod$by)-1, # Response variable
                    X  = X,           # Predictors
                    K  = K,           # Number of Predictors including the intercept
-                   N  = nobs,        # Sample size
+                   N  = nrow(logitmod),        # Sample size
                    xx = xx,
                    M = M
 )
@@ -43,7 +63,7 @@ logit_data <- list(Y  = logitmod$by, # Response variable
 LOGIT<-"model{
 
 # Diffuse normal priors for predictors
-for (i in 1:K) { beta[i] ~ dnorm(0, 0.0001) }
+for (i in 1:K) { beta[i] ~ dnorm(0, 0.001) }
 
 # Likelihood function
 for (i in 1:N){
@@ -82,6 +102,10 @@ jagsfit<- jags(data       = logit_data,
 # check results
 print(jagsfit,intervals=c(0.025, 0.975),justify = "left", digits=2)
 
+jagsresults(x=jagsfit, params=c('beta'))
+
+
+
 
 # Plot
 y <- jagsresults(x=jagsfit, params=c('px'))
@@ -109,8 +133,8 @@ mCat <- readPNG("cat_ferinha.png")
 
 
 g <- ggplot(logitmod,aes(x=x1,y=by))+
-#  geom_point(colour="#dd0100",size=1,alpha=0.45,position = position_jitter (h = 0.025))+
- geom_ribbon(data=gdata,aes(x=xx,ymin=lwr2, ymax=upr2,y=NULL), alpha=0.95, fill = c("#fac901"),show.legend=FALSE) +
+  #  geom_point(colour="#dd0100",size=1,alpha=0.45,position = position_jitter (h = 0.025))+
+  geom_ribbon(data=gdata,aes(x=xx,ymin=lwr2, ymax=upr2,y=NULL), alpha=0.95, fill = c("#fac901"),show.legend=FALSE) +
   geom_ribbon(data=gdata,aes(x=xx,ymin=lwr1, ymax=upr1,y=NULL), alpha=0.95, fill=c("#225095"),show.legend=FALSE) +
   geom_point(aes(x=x,y=y),size=2.75,data=gbin,colour="#dd0100")+
   geom_errorbar(data=gbin,aes(x=x,y=y,ymin=y-2*means.se,ymax=y+2*means.se),alpha=0.85,
@@ -120,13 +144,13 @@ g <- ggplot(logitmod,aes(x=x1,y=by))+
 
 
 for (i in 1:nrow(gbin)){
-g= g +
-  annotation_custom(
-    rasterGrob(mCat),
-    xmin = gbin$x[i] - 0.02,
-    xmax = gbin$x[i] + 0.02,
-    ymin = gbin$y[i] - 0.02,
-    ymax = gbin$y[i] + 0.02
-  )
+  g= g +
+    annotation_custom(
+      rasterGrob(mCat),
+      xmin = gbin$x[i] - 0.02,
+      xmax = gbin$x[i] + 0.02,
+      ymin = gbin$y[i] - 0.02,
+      ymax = gbin$y[i] + 0.02
+    )
 }
 g
