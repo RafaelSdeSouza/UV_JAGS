@@ -46,7 +46,7 @@ visreg(fit,"x1",scale="response",
 
 
 
-fit <- gam(y ~ s(x1,bs="cr",k=30)  + x3,  family= binomial(link="logit"),method="REML")
+fit <- gam(y ~ s(x1,bs="cr",k=30) +  s(x2,bs="cr",k=30) + x3,  family= binomial(link="logit"),method="REML")
 
 
 visreg(fit,"x1","x3",scale="response",
@@ -55,8 +55,38 @@ visreg(fit,"x1","x3",scale="response",
 
 
 
-visreg2d(fit,"x1","x2",cond = list(x3 = c("Retired/Passive")),plot.type = "persp",scale="response",
-         zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass")
+
+par(mfrow=c(2,3))
+         visreg2d(fit,"x1","x2",cond = list(x3 = c("Retired/Passive")),plot.type = "persp",scale="response",
+                 zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass",main="Retired/Passive",zlim=c(0,0.8),
+                 theta=40,phi=12.5,color="#e41a1c")
+         
+         visreg2d(fit,"x1","x2",cond = list(x3 = c("SF")),plot.type = "persp",scale="response",
+                 zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass",main="SF",zlim=c(0,0.8),
+                 theta=40,phi=12.5,color="#377eb8")
+         
+         visreg2d(fit,"x1","x2",cond = list(x3 = c("Lineless")),plot.type = "persp",scale="response",
+                  zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass",main="Lineless",zlim=c(0,0.8),
+                  theta=40,phi=12.5,color="#4daf4a")
+        
+          visreg2d(fit,"x1","x2",cond = list(x3 = c("wAGN")),plot.type = "persp",scale="response",
+                  zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass",main="wAGN",zlim=c(0,0.8),
+                  theta=40,phi=12.5,color="#984ea3")
+         
+         visreg2d(fit,"x1","x2",cond = list(x3 = c("sAGN")),plot.type = "persp",scale="response",
+zlab = "UV upturn fraction", xlab="Redshift",ylab="Stellar Mass",main="sAGN",zlim=c(0,0.8),
+theta=40,phi=12.5,color="#ff7f00")
+
+
+
+
+
+
+
+
+
+
+
 
 
 
