@@ -3,14 +3,18 @@ library("rstan")
 require("plot3D")
 require(mgcv)
 require(visreg)
+require(dplyr)
+require(forcats)
+require(magrittr)
 
 
 uv <- read.csv("binom_reg_dataset.csv")
 
-nobs <- nrow(uv)
+N <- nrow(uv)
 x1 <- uv$Z
-x2 <- uv$STELLAR_MASS
-x3 <-  uv$WHAN_CLASS
+x2 <- scale(uv$STELLAR_MASS)
+x3 <-  uv$WHAN_CLASS %>% fct_explicit_na("lineless")
+
 y <- uv$LOGIT_CLASS.1.UVUP.0.UVWEAK.
 
 X <- model.matrix(~ 1 + x1 + I(x1^2) + x2 + I(x2^2) )
@@ -18,98 +22,78 @@ K <- ncol(X)
 re <- as.numeric(x3)
 Nre <- length(unique(re))
 
+# Generated quantities
+grid1 <- seq(min(x1),max(x1),length.out = 100)
+grid2 <- seq(min(x2),max(x2),length.out = 100)
+grid <- expand.grid(grid1,grid2)
+xx1 <- grid[,1]
+xx2 <- grid[,2]
+XX <-  model.matrix(~ 1 + xx1 + I(xx1^2) + xx2 + I(xx2^2) )
+M <- nrow(XX)
+
 stan_data  <- list(y = y,
                    X = X,
-                   x2 = x2,
-                   x3 = x3
+                   N = N,
+                   K = K, 
+                   re = re,
+                   Nre = Nre,
+                   M = M, 
+                   XX = XX
                   )
 
 
 
-stan_model= "
-
-functions {
-  vector build_b_spline(real[] t, real[] ext_knots, int ind, int order);
-  vector build_b_spline(real[] t, real[] ext_knots, int ind, int order) {
-  vector[size(t)] b_spline;
-  vector[size(t)] w1 = rep_vector(0, size(t));
-  vector[size(t)] w2 = rep_vector(0, size(t));
-  if (order==1)
-  for (i in 1:size(t))
-  b_spline[i] = (ext_knots[ind] <= t[i]) && (t[i] < ext_knots[ind+1]); 
-  else {
-  if (ext_knots[ind] != ext_knots[ind+order-1])
-  w1 = (to_vector(t) - rep_vector(ext_knots[ind], size(t))) / 
-  (ext_knots[ind+order-1] - ext_knots[ind]);
-  if (ext_knots[ind+1] != ext_knots[ind+order])
-  w2 = 1 - (to_vector(t) - rep_vector(ext_knots[ind+1], size(t))) / 
-  (ext_knots[ind+order] - ext_knots[ind+1]);
-  b_spline = w1 .* build_b_spline(t, ext_knots, ind, order-1) + 
-  w2 .* build_b_spline(t, ext_knots, ind+1, order-1);
+stan_model = "
+ data {
+  int<lower=1>N;
+  int<lower=1>M;
+  int<lower=1>Nre;
+  int<lower=1> K;
+  int re[N];
+  matrix[N,K] X; 
+  matrix[M,K] XX; 
+  int<lower=0, upper=1> y[N];
 }
-return b_spline;
-}
-}
-
-data {
-  int N;
-  int num_knots;
-  vector[num_knots] knots;
-  int spline_degree; 
-  real Y[N];
-  real X[N];
-}
-
-
-transformed data {
-  int num_basis = num_knots + spline_degree - 1; // total number of B-splines
-  matrix[num_basis, N] B;  // matrix of B-splines
-  vector[spline_degree + num_knots] ext_knots_temp;
-  vector[2*spline_degree + num_knots] ext_knots; // set of extended knots
-  ext_knots_temp = append_row(rep_vector(knots[1], spline_degree), knots);
-  ext_knots = append_row(ext_knots_temp, rep_vector(knots[num_knots], spline_degree));
-  for (ind in 1:num_basis)
-  B[ind,:] = to_row_vector(build_b_spline(X, to_array_1d(ext_knots), ind, spline_degree + 1));
-  B[num_knots + spline_degree - 1, N] = 1; 
-}
-
-
 
 parameters {
-row_vector[num_basis] a_raw;
-real a0;
-real<lower=0> sigma;
-real<lower=0> tau;
+    matrix[K,Nre] beta;       // 25 betas!
+    real<lower=0> sigma;    // Shared hyperpriors
+    real mu;                // Shared hyperpriors
 
-}
-
-
-
-transformed parameters {
-  row_vector[num_basis] a;
-vector[N] Y_hat;
-a[1] = a_raw[1];
-for (i in 2:num_basis)
-a[i] = a[i-1] + a_raw[i]*tau; 
-Y_hat = a0*to_vector(X) + to_vector(a*B);
 }
 
 
 model {
-a_raw ~ normal(0, 1);
-tau ~ cauchy(0, 1);
-sigma ~ cauchy(0, 1);
-Y ~ normal(Y_hat, sigma);
+   vector[N] pi;
+    for (i in 1:N) {
+      pi[i] = beta[1,re[i]]*X[i,1] + beta[2,re[i]]*X[i,2] + 
+      beta[3,re[i]]*X[i,3] + beta[4,re[i]]*X[i,4] + beta[5,re[i]]*X[i,5];
+       }
+
+ // shared hyperpriors
+     sigma ~ gamma(0.001, 0.001);
+     mu ~ normal(0, 100);
+
+// priors and likelihood
+    for (i in 1:K) {
+    for (j in 1:Nre) beta[i,j] ~ normal(mu, sigma);
+    }
+
+  y ~ bernoulli_logit(pi);
 }
 
 generated quantities{
-vector[N] mu_pred;
-// Posterior parameter distribution of the mean
+vector[M] pi_1;
+vector[M] eta_1;
+for(j in 1:M){
 
-mu_pred = a0*to_vector(X) + to_vector(a*B);
-
+eta_1[j] = beta[1,1]*XX[j,1] + beta[2,1]*XX[j,2] + 
+      beta[3,1]*XX[j,3] + beta[4,1]*XX[j,4] + beta[5,1]*XX[j,5];
+pi_1[j] = inv_logit(eta_1[j]);
 }
 
+
+}
 
 "
 
@@ -117,23 +101,30 @@ fit <- stan(model_code = stan_model,
               data = stan_data,
               seed = 42,
               chains = 3,
-              iter =1500,
-              cores= 3,
-              warmup=750)
+              iter = 5000,
+              cores = 3,
+              warmup = 1500,
+               control = list(max_treedepth = 20,
+                              adapt_delta=0.99))
 
 
 
 
-Y_mean <- extract(fit, "mu_pred")
-Y_mean_cred <- apply(Y_mean$mu_pred, 2, quantile, c(0.05, 0.95))
-Y_mean_mean <- apply(Y_mean$mu_pred, 2, mean)
+pi_1 <- rstan::extract(fit,pars ="pi_1")
 
 
-fitdat <- data.frame(x = X, y = Y_mean_mean, lwr1 = Y_mean_cred[1,],upr1 = Y_mean_cred[2,])
 
-ggplot(data=gdat,aes(x=x,y=y)) +
-  geom_point() +
-  geom_line(data=fitdat,aes(x=x,y=y)) +
-  geom_ribbon(data=fitdat,aes(x=x,ymin=lwr1, ymax=upr1,y=NULL),fill=c("gray50"),alpha=0.5) +
-  theme_bw()
+p1_quant <- apply(pi_1$pi_1, 2, quantile, c(0.05,0.5, 0.95))
+
+pi_1_mean <- p1_quant[2,]
+
+
+
+persp3D(x=grid1, y = sd(uv$STELLAR_MASS)*grid2 + mean(uv$STELLAR_MASS), z = matrix(pi_1_mean,nrow=100,ncol=100, byrow = TRUE),   
+        cex = 1, cex.lab=1.5,type="p",pch = 19,alpha=0.5,
+        theta = 25, phi = 15, ticktype = "detailed",col="cyan3",bty = "b2",
+        xlab="redshift",
+        ylab="Log Mass",
+        zlab="UV fraction")
+
 
