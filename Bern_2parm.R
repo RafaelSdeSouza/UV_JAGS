@@ -13,6 +13,8 @@
 require("plot3D")
 require(mgcv)
 require(visreg)
+require(dplyr)
+require(magrittr)
 
 #set.seed(1056)                                    # set seed to replicate example
 #nobs= 1000                                        # number of obs in model
@@ -27,7 +29,11 @@ uv <- read.csv("binom_reg_dataset.csv")
 nobs <- nrow(uv)
 x1 <- uv$Z
 x2 <- uv$STELLAR_MASS
-x3 <-  uv$WHAN_CLASS
+x3 <-  uv$WHAN_CLASS 
+x3na <- addNA(x3)
+levels(x3na) <- c(levels(x3), "Lineless")
+x3 <- x3na 
+
 y <- uv$LOGIT_CLASS.1.UVUP.0.UVWEAK.
 
 
@@ -40,7 +46,7 @@ visreg(fit,"x1",scale="response",
 
 
 
-fit <- gam(y ~ s(x1,bs="cr",k=30)  + s(x3,bs="re",k=30),  family= binomial(link="logit"),method="REML")
+fit <- gam(y ~ s(x1,bs="cr",k=30)  + x3,  family= binomial(link="logit"),method="REML")
 
 
 visreg(fit,"x1","x3",scale="response",
