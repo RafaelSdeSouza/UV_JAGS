@@ -85,11 +85,35 @@ model {
 generated quantities{
 vector[M] pi_1;
 vector[M] eta_1;
+vector[M] pi_2;
+vector[M] eta_2;
+vector[M] pi_3;
+vector[M] eta_3;
+vector[M] pi_4;
+vector[M] eta_4;
+vector[M] pi_5;
+vector[M] eta_5;
 for(j in 1:M){
 
 eta_1[j] = beta[1,1]*XX[j,1] + beta[2,1]*XX[j,2] + 
       beta[3,1]*XX[j,3] + beta[4,1]*XX[j,4] + beta[5,1]*XX[j,5];
 pi_1[j] = inv_logit(eta_1[j]);
+
+eta_2[j] = beta[1,2]*XX[j,1] + beta[2,2]*XX[j,2] + 
+      beta[3,2]*XX[j,3] + beta[4,2]*XX[j,4] + beta[5,2]*XX[j,5];
+pi_2[j] = inv_logit(eta_2[j]);
+
+eta_3[j] = beta[1,3]*XX[j,1] + beta[2,3]*XX[j,2] + 
+      beta[3,3]*XX[j,3] + beta[4,3]*XX[j,4] + beta[5,3]*XX[j,5];
+pi_3[j] = inv_logit(eta_3[j]);
+
+eta_4[j] = beta[1,4]*XX[j,1] + beta[2,4]*XX[j,2] + 
+      beta[3,4]*XX[j,3] + beta[4,4]*XX[j,4] + beta[5,4]*XX[j,5];
+pi_4[j] = inv_logit(eta_4[j]);
+
+eta_5[j] = beta[1,5]*XX[j,1] + beta[2,5]*XX[j,2] + 
+      beta[3,5]*XX[j,3] + beta[4,5]*XX[j,4] + beta[5,5]*XX[j,5];
+pi_5[j] = inv_logit(eta_5[j]);
 }
 
 
@@ -101,9 +125,9 @@ fit <- stan(model_code = stan_model,
               data = stan_data,
               seed = 42,
               chains = 3,
-              iter = 5000,
+              iter = 500,
               cores = 3,
-              warmup = 1500,
+              warmup = 150,
                control = list(max_treedepth = 20,
                               adapt_delta=0.99))
 
@@ -111,20 +135,24 @@ fit <- stan(model_code = stan_model,
 
 
 pi_1 <- rstan::extract(fit,pars ="pi_1")
-
-
-
 p1_quant <- apply(pi_1$pi_1, 2, quantile, c(0.05,0.5, 0.95))
-
 pi_1_mean <- p1_quant[2,]
-
-
 
 persp3D(x=grid1, y = sd(uv$STELLAR_MASS)*grid2 + mean(uv$STELLAR_MASS), z = matrix(pi_1_mean,nrow=100,ncol=100, byrow = TRUE),   
         cex = 1, cex.lab=1.5,type="p",pch = 19,alpha=0.5,
-        theta = 25, phi = 15, ticktype = "detailed",col="cyan3",bty = "b2",
+        theta=40,phi=12.5, ticktype = "detailed",col="cyan3",bty = "b2",
         xlab="redshift",
         ylab="Log Mass",
         zlab="UV fraction")
 
 
+pi_2 <- rstan::extract(fit,pars ="pi_2")
+p2_quant <- apply(pi_2$pi_2, 2, quantile, c(0.05,0.5, 0.95))
+pi_2_mean <- p2_quant[2,]
+
+persp3D(x=grid1, y = sd(uv$STELLAR_MASS)*grid2 + mean(uv$STELLAR_MASS), z = matrix(pi_2_mean,nrow=100,ncol=100, byrow = TRUE),   
+        cex = 1, cex.lab=1.5,type="p",pch = 19,alpha=0.5,
+        theta=40,phi=12.5, ticktype = "detailed",col="cyan3",bty = "b2",
+        xlab="redshift",
+        ylab="Log Mass",
+        zlab="UV fraction")
